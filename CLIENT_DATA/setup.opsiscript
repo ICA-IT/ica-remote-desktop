@@ -1,0 +1,163 @@
+; ----------------------------------------------------------------
+; Copyright (c) uib gmbh (www.uib.de)
+; This sourcecode is owned by uib
+; and published under the Terms of the General Public License.
+; credits: http://www.opsi.org/en/credits/
+; ----------------------------------------------------------------
+
+;****************************************
+; SETUPTYPE      nsis
+;****************************************
+; PRODUCTID      ica-remote-desktop
+; SETUPFILE      none
+;****************************************
+; LICENSE        false     
+; PRODUCTDESC    Set the client computer to accept (or reject) remote dektop connections
+
+; PRODUCTNAME    remotedesktop
+; PRODUCTSIZE    64 MB
+; PRODUCTVER     1
+;****************************************
+; SETUPSCRIPT    setup.opsiscript
+; UNINSSCRIPT    uninstall.opsiscript
+;****************************************
+; MSIID          
+; USE-MST        
+; INSTALLDIR     
+;****************************************
+; TIMESTAMP      3/15/2019 2:26:39
+;****************************************
+
+[Actions]
+requiredWinstVersion >= "4.11.4.3"
+ScriptErrorMessages = false
+
+DefVar $SetupType$
+DefVar $ProductId$ 
+DefVar $Setupfile$ 
+DefVar $InstallDir$
+DefVar $MinimumSpace$
+DefVar $ExitCode$
+DefVar $ErrorMsg$
+DefVar $LicenseRequired$
+DefVar $LicenseKey$
+DefVar $LicensePool$
+DefVar $MsiId$
+DefVar $NsisInstallBatch$
+DefVar $LogDir$
+
+DefVar $PROP_startservice$
+DefVar $PROP_setremotedesktop$
+DefVar $PROP_setfirewall$
+
+set $PROP_startservice$ = GetProductProperty("startservice","true")
+set $PROP_setremotedesktop$ = GetProductProperty("setremotedesktop","true")
+set $PROP_setfirewall$ = GetProductProperty("setfirewall","true")
+
+Set $LogDir$ = "%opsiLogDir%"
+
+include_append "%ScriptPath%\check_nsis_exitcode.opsiscript"
+
+; ----------------------------------------------------------------
+Set $SetupType$       = "nsis"
+; ----------------------------------------------------------------
+
+; $ProductId$ is the name of the product in opsi, only lower letters, no umlauts, no white spaces, use '-' as a seperator
+Set $ProductId$       = "ica-remote-desktop"
+Set $Setupfile$       = ""
+; the path where we find the product after the installation
+Set $InstallDir$      = ""
+Set $LicenseRequired$ = "false"
+Set $LicensePool$     = "p_" + $ProductId$
+Set $MsiId$           = ""
+Set $MinimumSpace$    = "64 MB"
+; ----------------------------------------------------------------
+; ----------------------------------------------------------------
+
+if not(HasMinimumSpace ("%SystemDrive%", $MinimumSpace$))
+   LogError "Not enough space on %SystemDrive%, " + $MinimumSpace$ + " on drive %SystemDrive% needed for " + $ProductId$
+   isFatalError "No Space"
+   ; Stop process and set installation status to failed
+else
+   comment "Show product picture"
+   ShowBitmap "%ScriptPath%\" + $ProductId$ + ".png" $ProductId$
+
+   if FileExists("%ScriptPath%\delsub.opsiscript")
+      comment "Start uninstall sub section"
+      Sub "%ScriptPath%\delsub.opsiscript"
+   endif
+   
+   Message "Installing " + $ProductId$ + " ..."
+
+   comment "Start setup program"
+   ChangeDirectory "%SCRIPTPATH%"
+   
+   
+; case on firewall ============================================================
+
+; "turn off firewall"
+   if ($PROP_setfirewall$ = "true")
+       comment "Dissable Windows Firewall"
+       DOSInAnIconNukeFirewall
+   endif
+
+      ;----------------------------------------------
+   Sub_check_exitcode
+   
+; end case on firewall ========================================================
+   
+    
+; case on allow remote desktop ================================================
+
+; "activate remote desktop for anyone"
+   if ($PROP_setremotedesktop$ = "true")
+       comment "Enable Remote Desktop"
+       Registry_EnableRD /SysNative
+   endif
+
+      ;----------------------------------------------
+   Sub_check_exitcode
+   
+; end case on allow remote desktop ============================================
+
+
+; case on start remote desktop service ========================================
+
+; "start remote desktop service"
+   if ($PROP_startservice$ = "true")
+       comment "Start Remote Desktop Service"
+       DOSInAnIconStartRDService
+   endif
+
+      ;----------------------------------------------
+;   Sub_check_exitcode
+   
+; end case on start remote desktop service ====================================
+  
+  
+; endif on is disk space available   
+endif
+
+; ----------------------------------------------------------------
+; install section
+; ----------------------------------------------------------------
+
+[DOSInAnIconNukeFirewall]
+netsh advfirewall set currentprofile state off
+
+; ----------------------------------------------------------------
+
+
+[Registry_EnableRD]
+openkey [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server]
+set "fDenyTSConnections" = REG_DWORD:00000000
+
+; ----------------------------------------------------------------
+
+[DOSInAnIconStartRDService]
+net start
+net start "Remote Desktop Services"
+
+; ----------------------------------------------------------------
+; ----------------------------------------------------------------
+

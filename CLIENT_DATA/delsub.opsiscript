@@ -1,0 +1,89 @@
+; Copyright (c) uib gmbh (www.uib.de)
+; This sourcecode is owned by uib gmbh
+; and published under the Terms of the General Public License.
+; credits: http://www.opsi.org/en/credits/
+
+include_append "%ScriptPath%\check_nsis_exitcode.opsiscript"
+
+DefVar $UninstallProgram$
+
+Set $MsiId$     = ''
+
+Message "Uninstalling " + $ProductId$ + " ..."
+
+if ($SetupType$ = "nsis")
+
+   
+; case on firewall ============================================================
+
+; "turn on firewall"
+   if ($PROP_setfirewall$ = "true")
+       comment "Enable Windows Firewall"
+       DOSInAnIconOnFirewall
+   endif
+
+      ;----------------------------------------------
+   Sub_check_exitcode
+   
+; end case on firewall ========================================================
+   
+    
+; case on disable remote desktop ================================================
+
+; "de-activate remote desktop"
+   if ($PROP_setremotedesktop$ = "true")
+       comment "Disable Remote Desktop"
+       Registry_DisableRD /SysNative
+   endif
+
+      ;----------------------------------------------
+   Sub_check_exitcode
+   
+; end case on disable remote desktop ============================================
+
+
+; case on stop remote desktop service ========================================
+
+; "stop remote desktop service"
+   if ($PROP_startservice$ = "true")
+       comment "Stop Remote Desktop Service"
+       DOSInAnIconStopRDService
+   endif
+
+      ;----------------------------------------------
+;   Sub_check_exitcode
+   
+; end case on stop remote desktop service ====================================
+
+
+; endif on nsis
+endif
+
+if (not($InstallDir$ = '')) and (not($InstallDir$ = "not used"))
+   Files_uninstall
+endif
+
+; ----------------------------------------------------------------
+; install section
+; ----------------------------------------------------------------
+
+[DOSInAnIconOnFirewall]
+netsh advfirewall set currentprofile state on
+
+; ----------------------------------------------------------------
+
+[Registry_DisableRD]
+openkey [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server]
+set "fDenyTSConnections" = REG_DWORD:00000001
+
+; ----------------------------------------------------------------
+
+[DOSInAnIconStopRDService]
+net start
+net stop "Remote Desktop Services" /Y
+
+; ----------------------------------------------------------------
+
+[Files_uninstall]
+del -sf "$InstallDir$\"
+;-----------------------------------------------------
